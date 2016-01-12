@@ -11,11 +11,26 @@ public class FieldOfView : MonoBehaviour
 	public LayerMask targetMask;
 	public LayerMask obstacleMask;
 
+	[HideInInspector]
 	public List<Transform> visibleTargets = new List<Transform>();
 
+	public float meshResolution;
+	public MeshFilter viewMeshFilter;
+
+	Mesh viewMesh;
+	 
 	void Start ()
 	{
+		viewMesh = new Mesh(); 
+		viewMesh.name = "View Mesg";
+		viewMeshFilter.mesh = viewMesh;
+
 		StartCoroutine(FindTargetsWithDelay(.2f));
+	}
+
+	void LateUpdate ()
+	{
+		DrawFieldOfView();
 	}
 
 	IEnumerator FindTargetsWithDelay (float delay)
@@ -50,6 +65,55 @@ public class FieldOfView : MonoBehaviour
 		}
 	}
 
+	void DrawFieldOfView ()
+	{
+		int stepCount = Mathf.RoundToInt(viewAngle * meshResolution);
+		float stepAngleSize = viewAngle / stepCount;
+		List<Vector3> viewPoints = new List<Vector3>();
+
+		for (int i = 0; i <= stepCount; i++) 
+		{
+			float angle = transform.eulerAngles.y - viewAngle / 2 + stepAngleSize * i;
+			ViewCastInfo newViewCast = ViewCast(angle);
+			viewPoints.Add(newViewCast.point);
+		}
+
+		int vertexCount = viewPoints.Count + 1;
+		Vector3[] verticies = new Vector3[vertexCount];
+		int[] triangles = new int[(vertexCount - 2) * 3];
+
+		verticies[0] = Vector3.zero;
+		for (int i = 0; i < vertexCount - 1; i++) 
+		{
+			verticies[i + 1] = transform.InverseTransformPoint(viewPoints[i]);
+
+			if (i < vertexCount - 2)
+			{
+				triangles[i * 3] = 0;
+				triangles[i * 3 + 1] = i + 1;
+				triangles[i * 3 + 2] = i + 2;
+			}
+		}
+		viewMesh.Clear();
+		viewMesh.vertices = verticies;
+		viewMesh.triangles = triangles;
+		viewMesh.RecalculateNormals();
+	}
+
+	ViewCastInfo ViewCast (float globalAngle)
+	{
+		Vector3 direction = DirectionFromAngle(globalAngle, true);
+		RaycastHit hit;
+		if (Physics.Raycast(transform.position, direction, out hit, viewRadius, obstacleMask))
+		{
+			return new ViewCastInfo(true, hit.point, hit.distance, globalAngle);
+		}
+		else
+		{
+			return new ViewCastInfo(false, transform.position + direction * viewRadius, viewRadius, globalAngle);
+		}
+	}
+
 	public Vector3 DirectionFromAngle (float angleInDegrees, bool angleIsGlobal)
 	{
 		if (angleIsGlobal == false) {
@@ -62,17 +126,26 @@ public class FieldOfView : MonoBehaviour
 	// Just a different implementation of DirectionFromAngle function.
 	public Vector3 VectorFromAngle (float angleInDegrees, bool angleIsGlobal)
 	{
-		Quaternion rot = Quaternion.AngleAxis(angleInDegrees, Vector3.up);
-
-		Vector3 lDirection = rot * Vector3.forward;
-
-		Vector3 wDirection = transform.TransformDirection(lDirection);
-
 		if (angleIsGlobal == false) {
-			return wDirection;
+			angleInDegrees += transform.eulerAngles.y;
 		}
-		else {
-			return lDirection;
+
+		return Quaternion.AngleAxis(angleInDegrees, Vector3.up) * Vector3.forward;
+	}
+
+	public struct ViewCastInfo
+	{
+		public bool hit;
+		public Vector3 point;
+		public float distance;
+		public float angle;
+
+		public ViewCastInfo (bool hit, Vector3 point, float distance, float angle)
+		{
+			this.hit = hit;
+			this.point = point;
+			this.distance = distance;
+			this.angle = angle;
 		}
 	}
 }
