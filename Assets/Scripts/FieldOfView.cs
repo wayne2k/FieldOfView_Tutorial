@@ -59,5 +59,20 @@ public class FieldOfView : MonoBehaviour
 		return new Vector3(Mathf.Sin(angleInDegrees * Mathf.Deg2Rad), 0f, Mathf.Cos(angleInDegrees * Mathf.Deg2Rad));
 	}
 
+	// Just a different implementation of DirectionFromAngle function.
+	public Vector3 VectorFromAngle (float angleInDegrees, bool angleIsGlobal)
+	{
+		Quaternion rot = Quaternion.AngleAxis(angleInDegrees, Vector3.up);
 
+		Vector3 lDirection = rot * Vector3.forward;
+
+		Vector3 wDirection = transform.TransformDirection(lDirection);
+
+		if (angleIsGlobal == false) {
+			return wDirection;
+		}
+		else {
+			return lDirection;
+		}
+	}
 }
